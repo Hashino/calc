@@ -13,6 +13,16 @@ mod calc {
     mod tests;
 }
 
+use clap::Parser;
+
+#[derive(Parser)]
+#[command(about, long_about = None)]
+struct Cli {
+    /// evaluates expression  from command line instead of interactive mode
+    #[arg(short, long)]
+    input: Option<String>,
+}
+
 fn show_help() {
     println!("Available commands:");
     println!("help - Show this help message");
@@ -29,6 +39,21 @@ fn show_help() {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
+
+    if let Some(input) = cli.input.as_deref() {
+        match evaluate(input.to_string()) {
+            Ok(res) => {
+                println!("{res:?}");
+                exit(0);
+            }
+            Err(e) => {
+                eprintln!("Error: {e}");
+                exit(1);
+            }
+        }
+    }
+
     let mut stdin = stdin().lock();
     let mut buffer = String::new();
 
@@ -39,12 +64,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match buffer.trim() {
             "help" | "h" => show_help(),
             "quit" | "q" => exit(0),
-            _ => {
-                match evaluate(buffer.clone()) {
-                    Ok(res) => println!("{res:?}"),
-                    Err(e) => eprintln!("Error: {e}"),
-                }
-            }
+            _ => match evaluate(buffer.clone()) {
+                Ok(res) => println!("{res:?}"),
+                Err(e) => eprintln!("Error: {e}"),
+            },
         }
     }
 }
