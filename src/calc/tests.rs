@@ -99,3 +99,59 @@ fn test_nested_factorial() {
     assert_eq!(evaluate("(3!)!".to_string()).unwrap(), 720.0);
     assert_eq!(evaluate("3!!".to_string()).unwrap(), 720.0);
 }
+
+#[test]
+fn test_division_by_zero() {
+    assert!(evaluate("5 / 0".to_string()).is_err());
+    assert!(evaluate("0 / 0".to_string()).is_err());
+}
+
+#[test]
+fn test_factorial_edge_cases() {
+    assert!(evaluate("2.5!".to_string()).is_err());
+    assert!(evaluate("0!".to_string()).unwrap() == 1.0);
+}
+
+#[test]
+fn test_sqrt_negative() {
+    assert!(evaluate("sqrt -1".to_string()).is_err());
+    assert!(evaluate("sqrt -4".to_string()).is_err());
+}
+
+#[test]
+fn test_ln_edge_cases() {
+    assert!(evaluate("ln 0".to_string()).is_err());
+    assert!(evaluate("ln -1".to_string()).is_err());
+}
+
+#[test]
+fn test_log_edge_cases() {
+    assert!(evaluate("10 log 1".to_string()).is_err()); // base 1
+    assert!(evaluate("-10 log 10".to_string()).is_err()); // negative argument
+    assert!(evaluate("10 log -10".to_string()).is_err()); // negative base
+}
+
+#[test]
+fn test_parsing_errors() {
+    assert!(evaluate("".to_string()).is_err()); // empty string
+    assert!(evaluate("abc".to_string()).is_err()); // invalid characters
+    assert!(evaluate("2 +".to_string()).is_err()); // incomplete expression
+    assert!(evaluate("(2 + 3".to_string()).is_err()); // unmatched parentheses
+    assert!(evaluate("2 + 3)".to_string()).is_err()); // extra closing paren
+}
+
+#[test]
+fn test_modulo_edge_cases() {
+    assert_eq!(evaluate("7 % 3".to_string()).unwrap(), 1.0);
+    assert_eq!(evaluate("7.5 % 2".to_string()).unwrap(), 1.5);
+}
+
+#[test]
+fn test_large_numbers() {
+    // Large factorial - 20! is 2432902008176640000, within u64
+    assert_eq!(evaluate("20!".to_string()).unwrap(), 2432902008176640000.0);
+    // Large exponentiation
+    assert_eq!(evaluate("2 ^ 100".to_string()).unwrap(), 1.2676506002282294e30);
+    // Very large exponent might cause inf
+    assert!(evaluate("10 ^ 1000".to_string()).unwrap().is_infinite());
+}
