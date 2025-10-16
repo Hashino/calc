@@ -1,3 +1,5 @@
+use std::error::Error;
+
 pub(super) enum Token {
     Unary(UnaryToken),   // Unary operations like sin, sqrt, !
     Binary(BinaryToken), // Binary operations like +, -, *, /
@@ -35,254 +37,320 @@ pub(super) enum BinaryOperator {
     Log,      // log
 }
 
-#[derive(PartialEq, PartialOrd)]
-pub(super) enum Precedence {
-    Lowest,
-    Addition,       // + -
-    Multiplication, // * / %
-    Exponentiation, // ^ log
-    Unary,          // ! sqrt sin cos tan ln (highest precedence)
+pub(super) struct Parser {
+    chars: std::iter::Peekable<std::vec::IntoIter<char>>,
 }
 
-pub(super) struct Parser<'a> {
-    chars: std::iter::Peekable<std::str::Chars<'a>>,
-}
-
-impl<'a> Parser<'a> {
-    pub fn new(input: &'a str) -> Self {
+impl Parser {
+    pub fn new(input: &str) -> Self {
+        let cleaned_chars: Vec<char> = input.chars().filter(|c| !c.is_whitespace()).collect();
         Self {
-            chars: input.chars().peekable(),
+            chars: cleaned_chars.into_iter().peekable(),
         }
     }
 
-    pub(crate) fn parse(&mut self) -> Result<Token, Box<dyn std::error::Error>> {
-        let expression = self.parse_expression(Precedence::Lowest)?;
-        self.skip_whitespace();
-        // Ensure no extra characters remain after parsing
-        if self.chars.peek().is_some() {
-            return Err("Unexpected characters at end of input".into());
+    pub(crate) fn parse(&mut self) -> Result<Token, Box<dyn Error>> {
+        if self.is_empty() {
+            return Err("Empty expression".into());
         }
-        Ok(expression)
+
+        let result: Token;
+
+        // Handle expressions starting with operators (using last result)
+        if let Some(op) = self.chars.peek().and_then(|&ch| match ch {
+            '+' => Some(BinaryOperator::Add),
+            '-' => Some(BinaryOperator::Subtract),
+            '*' => Some(BinaryOperator::Multiply),
+            '/' => Some(BinaryOperator::Divide),
+            '%' => Some(BinaryOperator::Modulo),
+            '^' => Some(BinaryOperator::Power),
+            _ => None,
+        }) {
+            self.consume_char();
+            let right = self.parse_expression(0)?;
+            result = Token::Binary(BinaryToken {
+                left: Box::new(Token::LastResult),
+                operation: op,
+                right: Box::new(right),
+            });
+        } else if self.current_char() == Some('!') {
+            // Handle factorial at start (e.g., "!" means "last_result!")
+            self.consume_char();
+            result = Token::Unary(UnaryToken {
+                operation: UnaryOperator::Factorial,
+                operand: Box::new(Token::LastResult),
+            });
+        } else {
+            // Parse normal expression
+            let root = self.parse_expression(0)?;
+            result = root;
+        }
+
+        if !self.is_empty() {
+            Err("Unexpected characters after expression".into())
+        } else {
+            Ok(result)
+        }
     }
 
-    // Parses an expression with precedence handling (recursive descent parser)
-    fn parse_expression(
+    fn parse_expression(&mut self, min_precedence: u8) -> Result<Token, Box<dyn Error>> {
+        let left = {
+            // Handle unary functions (sin, cos, sqrt, etc.)
+            if let Some(word) = self.peek_word() {
+                if let Some(unary_op) = match word.as_str() {
+                    "sqrt" => Some(UnaryOperator::SquareRoot),
+                    "sin" => Some(UnaryOperator::Sin),
+                    "cos" => Some(UnaryOperator::Cos),
+                    "tan" => Some(UnaryOperator::Tan),
+                    "ln" => Some(UnaryOperator::Ln),
+                    _ => None,
+                } {
+                    self.consume_word(&word);
+                    let operand = if self.is_empty() {
+                        Token::LastResult
+                    } else if self.current_char() == Some('-') {
+                        // Handle negative operands
+                        self.consume_char();
+
+                        if let Some(ch) = self.current_char() {
+                            if ch.is_ascii_digit() || ch == '.' {
+                                let num = self.parse_number()?;
+                                if let Token::Value(n) = num {
+                                    Token::Value(-n)
+                                } else {
+                                    return Err("Invalid negative number".into());
+                                }
+                            } else {
+                                return Err("Invalid negative operand".into());
+                            }
+                        } else {
+                            return Err("Invalid negative operand".into());
+                        }
+                    } else {
+                        self.parse_value()?
+                    };
+                    Token::Unary(UnaryToken {
+                        operation: unary_op,
+                        operand: Box::new(operand),
+                    })
+                } else {
+                    // Parse basic value and handle postfix factorial
+                    let value = self.parse_value()?;
+
+                    // Handle factorial (postfix operator)
+                    self.parse_factorial_chain(value)
+                }
+            } else if self.current_char() == Some('-') {
+                // Handle negative numbers and subtraction with last result
+                self.consume_char(); // consume '-'
+
+                // Check if it's a negative number
+                if let Some(ch) = self.current_char() {
+                    if ch.is_ascii_digit() || ch == '.' {
+                        let num = self.parse_number()?;
+                        if let Token::Value(n) = num {
+                            Token::Value(-n)
+                        } else {
+                            return Err("Invalid negative number".into());
+                        }
+                    } else {
+                        // It's subtraction with last result
+                        let right = self.parse_value()?;
+                        Token::Binary(BinaryToken {
+                            left: Box::new(Token::LastResult),
+                            operation: BinaryOperator::Subtract,
+                            right: Box::new(right),
+                        })
+                    }
+                } else {
+                    return Err("Unexpected end after minus sign".into());
+                }
+            } else {
+                // Parse basic value and handle postfix factorial
+                let value = self.parse_value()?;
+
+                // Handle factorial (postfix operator)
+                self.parse_factorial_chain(value)
+            }
+        };
+
+        self.parse_binary_chain(left, min_precedence)
+    }
+
+    fn parse_binary_chain(
         &mut self,
-        precedence: Precedence,
-    ) -> Result<Token, Box<dyn std::error::Error>> {
-        // Handle expressions starting with binary operators (e.g., "- 5" uses last result as left)
-        self.skip_whitespace();
-        if let Some(&c) = self.chars.peek() {
-            if self.is_binary_operator(c) {
-                // Binary operator at start means use last result as implicit left operand
-                let operator = self.parse_binary_operator(c).unwrap();
-                self.chars.next(); // consume the operator
-                let right = self.parse_expression(Precedence::Unary)?;
+        left: Token,
+        min_precedence: u8,
+    ) -> Result<Token, Box<dyn Error>> {
+        if let Some((precedence, op)) = self.peek_binary_op() {
+            if precedence >= min_precedence {
+                match op {
+                    BinaryOperator::Log => self.consume_word("log"),
+                    _ => {
+                        self.consume_char();
+                    }
+                }
 
-                return Ok(Token::Binary(BinaryToken {
-                    left: Box::new(Token::LastResult),
-                    operation: operator,
-                    right: Box::new(right),
-                }));
-            }
-        }
+                let right_precedence = if matches!(op, BinaryOperator::Power | BinaryOperator::Log) {
+                    precedence
+                } else {
+                    precedence + 1
+                };
 
-        // Parse the leftmost part of the expression
-        let mut left = self.parse_primary()?;
+                let right = self.parse_expression(right_precedence)?;
 
-        // Parse binary operators in precedence order
-        loop {
-            self.skip_whitespace();
-            let next_char = match self.chars.peek() {
-                Some(c) => *c,
-                None => break, // End of input
-            };
-
-            let op_precedence = self.get_precedence(next_char);
-            if op_precedence <= precedence {
-                break; // Lower precedence, stop here
-            }
-
-            if let Some(operator) = self.parse_binary_operator(next_char) {
-                self.chars.next(); // consume the operator
-                let right = self.parse_expression(op_precedence)?;
-                left = Token::Binary(BinaryToken {
+                let binary_token = Token::Binary(BinaryToken {
                     left: Box::new(left),
-                    operation: operator,
+                    operation: op,
                     right: Box::new(right),
                 });
-            } else {
-                break; // Not a binary operator
-            }
-        }
 
-        // Handle postfix factorial operator '!'
-        loop {
-            self.skip_whitespace();
-            if self.chars.peek() == Some(&'!') {
-                self.chars.next(); // consume '!'
-                left = Token::Unary(UnaryToken {
-                    operation: UnaryOperator::Factorial,
-                    operand: Box::new(left),
-                });
-            } else {
-                break; // No more factorials
+                return self.parse_binary_chain(binary_token, min_precedence);
             }
         }
 
         Ok(left)
     }
 
-    // Parses primary expressions: numbers, unary operators, or parenthesized expressions
-    fn parse_primary(&mut self) -> Result<Token, Box<dyn std::error::Error>> {
-        self.skip_whitespace();
-
-        match self.chars.peek() {
-            Some(&c) if c.is_digit(10) || c == '.' => self.parse_number(), // Numbers
-            Some(&c) if c.is_alphabetic() => self.parse_unary_operator(), // Unary functions like sin, sqrt
-            Some(&'(') => {
-                self.chars.next(); // consume '('
-                let expr = self.parse_expression(Precedence::Lowest)?; // Parse sub-expression
-                self.skip_whitespace();
-                if self.chars.next() != Some(')') {
-                    return Err("Expected ')'".into());
-                }
-                Ok(expr)
-            }
-            _ => Err("Unexpected character while parsing primary expression".into()),
+    fn parse_factorial_chain(&mut self, value: Token) -> Token {
+        if self.current_char() == Some('!') {
+            self.consume_char();
+            let factorial_token = Token::Unary(UnaryToken {
+                operation: UnaryOperator::Factorial,
+                operand: Box::new(value),
+            });
+            self.parse_factorial_chain(factorial_token)
+        } else {
+            value
         }
     }
 
-    // Parses a numeric literal (integer or floating point)
-    fn parse_number(&mut self) -> Result<Token, Box<dyn std::error::Error>> {
-        let mut num_str = String::new();
-
-        // Collect digits and decimal point
-        while let Some(&c) = self.chars.peek() {
-            if c.is_digit(10) || c == '.' {
-                num_str.push(c);
-                self.chars.next();
-            } else {
-                break;
-            }
-        }
-
-        // Parse the string into a float
-        let value = num_str.parse::<f64>()?;
-        Ok(Token::Value(value))
-    }
-
-    // Parses unary operators (functions like sin, sqrt, etc.)
-    fn parse_unary_operator(&mut self) -> Result<Token, Box<dyn std::error::Error>> {
-        let mut op_str = String::new();
-
-        // Collect alphabetic characters for the operator name
-        while let Some(&c) = self.chars.peek() {
-            if c.is_alphabetic() {
-                op_str.push(c);
-                self.chars.next();
-            } else {
-                break;
-            }
-        }
-
-        // Map string to operator enum
-        let operation = match op_str.as_str() {
-            "sqrt" => UnaryOperator::SquareRoot,
-            "sin" => UnaryOperator::Sin,
-            "cos" => UnaryOperator::Cos,
-            "tan" => UnaryOperator::Tan,
-            "ln" => UnaryOperator::Ln,
-            _ => return Err(format!("Unknown unary operator: {}", op_str).into()),
-        };
-
-        self.skip_whitespace();
-
-        // Handle case where no operand is provided (use last result)
-        if self.chars.peek().is_none() {
-            return Ok(Token::Unary(UnaryToken {
-                operation,
-                operand: Box::new(Token::LastResult),
-            }));
-        }
-
-        // Parse the operand
-        let operand = self.parse_primary()?;
-
-        Ok(Token::Unary(UnaryToken {
-            operation,
-            operand: Box::new(operand),
-        }))
-    }
-
-    // Parses a binary operator from the current character
-    fn parse_binary_operator(&mut self, c: char) -> Option<BinaryOperator> {
-        match c {
-            '+' => Some(BinaryOperator::Add),
-            '-' => Some(BinaryOperator::Subtract),
-            '*' => Some(BinaryOperator::Multiply),
-            '/' => Some(BinaryOperator::Divide),
-            '^' => Some(BinaryOperator::Power),
-            '%' => Some(BinaryOperator::Modulo),
-            _ => {
-                // Special handling for "log" which is 3 characters
-                if c == 'l' {
-                    let mut log_str = String::new();
-                    let mut peekable = self.chars.clone();
-                    for _ in 0..3 {
-                        if let Some(ch) = peekable.next() {
-                            log_str.push(ch);
-                        }
-                    }
-                    if log_str == "log" {
-                        // Consume the "log" characters
-                        for _ in 0..3 {
-                            self.chars.next();
-                        }
-                        return Some(BinaryOperator::Log);
-                    }
-                }
-                None
-            }
+    fn parse_value(&mut self) -> Result<Token, Box<dyn Error>> {
+        match self.current_char() {
+            Some('(') => self.parse_parentheses(),
+            Some(ch) if ch.is_ascii_digit() || ch == '.' => self.parse_number(),
+            Some(ch) => Err(format!("Unexpected character: {}", ch).into()),
+            None => Err("Unexpected end of expression".into()),
         }
     }
 
-    // Checks if the given character starts a binary operator
-    fn is_binary_operator(&self, c: char) -> bool {
-        return matches!(c, '+' | '-' | '*' | '/' | '^' | '%') || {
-            if c == 'l' {
-                // Check if it's "log"
-                let mut log_str = String::new();
-                let mut peekable = self.chars.clone();
-                for _ in 0..3 {
-                    if let Some(ch) = peekable.next() {
-                        log_str.push(ch);
-                    }
-                }
-                return log_str == "log";
-            }
-            return false;
-        };
+    fn parse_parentheses(&mut self) -> Result<Token, Box<dyn Error>> {
+        self.consume_char(); // consume '('
+
+        let expr = self.parse_expression(0)?;
+        if self.current_char() != Some(')') {
+            return Err("Missing closing parenthesis".into());
+        }
+        self.consume_char(); // consume ')'
+
+        Ok(expr)
     }
 
-    // Returns the precedence level of the operator starting with the given character
-    fn get_precedence(&self, c: char) -> Precedence {
-        match c {
-            '+' | '-' => Precedence::Addition,
-            '*' | '/' | '%' => Precedence::Multiplication,
-            '^' | 'l' => Precedence::Exponentiation, // 'l' for log or ln
-            _ => Precedence::Lowest,
+    fn parse_number(&mut self) -> Result<Token, Box<dyn Error>> {
+        let number = self.collect_number_chars(String::new(), false)?;
+        number
+            .parse::<f64>()
+            .map(Token::Value)
+            .map_err(|_| "Invalid number format".into())
+    }
+
+    fn collect_number_chars(
+        &mut self,
+        mut number: String,
+        has_decimal: bool,
+    ) -> Result<String, Box<dyn Error>> {
+        match self.current_char() {
+            Some(ch) if ch.is_ascii_digit() => {
+                number.push(ch);
+                self.consume_char();
+                self.collect_number_chars(number, has_decimal)
+            }
+            Some('.') if !has_decimal => {
+                number.push('.');
+                self.consume_char();
+                self.collect_number_chars(number, true)
+            }
+            _ => Ok(number),
         }
     }
 
-    // Skips over whitespace characters in the input
-    fn skip_whitespace(&mut self) {
-        while let Some(&c) = self.chars.peek() {
-            if c.is_whitespace() {
-                self.chars.next();
-            } else {
-                break;
+
+
+    fn peek_binary_op(&mut self) -> Option<(u8, BinaryOperator)> {
+        // Check for word operators first
+        if let Some(word) = self.peek_word() {
+            if word == "log" {
+                return Some((3, BinaryOperator::Log));
             }
+        }
+
+        // Check for character operators
+        self.chars.peek().and_then(|&ch| match ch {
+            '+' => Some((0, BinaryOperator::Add)),
+            '-' => Some((0, BinaryOperator::Subtract)),
+            '*' => Some((1, BinaryOperator::Multiply)),
+            '/' => Some((1, BinaryOperator::Divide)),
+            '%' => Some((1, BinaryOperator::Modulo)),
+            '^' => Some((2, BinaryOperator::Power)),
+            _ => None,
+        })
+    }
+
+
+
+
+
+
+
+
+
+
+
+    // Simple helper functions
+    fn current_char(&mut self) -> Option<char> {
+        self.chars.peek().copied()
+    }
+
+    fn consume_char(&mut self) {
+        self.chars.next();
+    }
+
+    fn is_empty(&mut self) -> bool {
+        self.chars.peek().is_none()
+    }
+
+
+
+
+
+    fn peek_word(&mut self) -> Option<String> {
+        let word = self.collect_word_chars(String::new(), self.chars.clone());
+        if word.is_empty() { None } else { Some(word) }
+    }
+
+    fn collect_word_chars(
+        &self,
+        mut word: String,
+        mut chars_iter: std::iter::Peekable<std::vec::IntoIter<char>>,
+    ) -> String {
+        match chars_iter.peek() {
+            Some(&ch) if ch.is_alphabetic() => {
+                word.push(ch);
+                chars_iter.next();
+                self.collect_word_chars(word, chars_iter)
+            }
+            _ => word,
+        }
+    }
+
+    fn consume_word(&mut self, word: &str) {
+        self.consume_word_recursive(word.len());
+    }
+
+    fn consume_word_recursive(&mut self, remaining: usize) {
+        if remaining > 0 {
+            self.consume_char();
+            self.consume_word_recursive(remaining - 1);
         }
     }
 }

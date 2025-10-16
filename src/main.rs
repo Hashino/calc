@@ -3,7 +3,8 @@ use std::{
     process::exit,
 };
 
-use crate::calc::calculator::evaluate;
+use crate::calc::calculator::evaluate_with_debug;
+use crate::log::{Level, log};
 
 mod calc {
     pub mod calculator;
@@ -13,6 +14,8 @@ mod calc {
     mod tests;
 }
 
+mod log;
+
 use clap::Parser;
 
 #[derive(Parser)]
@@ -21,6 +24,10 @@ struct Cli {
     /// evaluates expression from command line instead of interactive mode
     #[arg(short, long)]
     input: Option<String>,
+
+    /// displays AST for each expression (for debugging)
+    #[arg(short, long, default_value_t = false)]
+    debug: bool,
 }
 
 fn show_help() {
@@ -53,17 +60,18 @@ fn main() {
 
     // If an input expression is provided via CLI, evaluate it and exit
     if let Some(input) = cli.input.as_deref() {
-        match evaluate(input.to_string()) {
+        match evaluate_with_debug(input.to_string(), cli.debug) {
             Ok(res) => {
                 if !res.is_nan() {
                     println!("{}", format_result(res));
                     exit(0);
                 } else {
+                    println!("{}", format_result(res));
                     exit(1);
                 }
             }
             Err(e) => {
-                eprintln!("Error evaluating expression: {:?}", e);
+                log(Level::Error, &format!("{:?}", e));
                 exit(1);
             }
         }
@@ -75,7 +83,7 @@ fn main() {
     loop {
         buffer.clear();
         if let Err(e) = stdin.read_line(&mut buffer) {
-            eprintln!("Error reading input: {e}");
+            log(Level::Error, &e.to_string());
             exit(1);
         }
 
@@ -83,12 +91,12 @@ fn main() {
             "help" | "h" => show_help(),
             "quit" | "q" => exit(0),
             _ => {
-                match evaluate(buffer.clone()) {
+                match evaluate_with_debug(buffer.clone(), cli.debug) {
                     Ok(res) => {
                         println!("{}", format_result(res));
                     }
                     Err(e) => {
-                        eprintln!("Error: {:?}", e);
+                        log(Level::Error, &format!("{:?}", e));
                         continue;
                     }
                 };

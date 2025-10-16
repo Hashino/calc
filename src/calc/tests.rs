@@ -13,6 +13,7 @@ fn test_subtraction() {
 #[test]
 fn test_multiplication() {
     assert_eq!(evaluate("4 * 2".to_string()).unwrap(), 8.0);
+    assert_eq!(evaluate("3 * -1".to_string()).unwrap(), -3.0);
 }
 
 #[test]
@@ -23,6 +24,8 @@ fn test_division() {
 #[test]
 fn test_exponentiation() {
     assert_eq!(evaluate("2 ^ 3".to_string()).unwrap(), 8.0);
+    assert_eq!(evaluate("9 ^ 0.5".to_string()).unwrap(), 3.0);
+    assert_eq!(evaluate("8 ^ -1".to_string()).unwrap(), 0.125);
 }
 
 #[test]
@@ -67,10 +70,7 @@ fn test_natural_log() {
 
 #[test]
 fn test_complex_expression() {
-    assert_eq!(
-        evaluate("3 + 5 * 2 - 4 / 2 ^ 2".to_string()).unwrap(),
-        12.0
-    );
+    assert_eq!(evaluate("3 + 5 * 2 - 4 / 2 ^ 2".to_string()).unwrap(), 12.0);
     assert_eq!(evaluate("sqrt 16 + 3 ! - 2 ^ 3".to_string()).unwrap(), 2.0);
     assert_eq!(
         evaluate("10 log 10 + sin 90 * 2".to_string()).unwrap(),
@@ -89,8 +89,11 @@ fn test_last_result_feature() {
 #[test]
 fn test_last_result_only_at_beginning() {
     assert_eq!(evaluate("10 - 5".to_string()).unwrap(), 5.0);
-    assert!(evaluate("2 *".to_string()).is_err());
-    assert!(evaluate("2 +".to_string()).is_err());
+    assert_eq!(evaluate("- 2".to_string()).unwrap(), 3.0);
+    assert_eq!(evaluate("* 3".to_string()).unwrap(), 9.0);
+    assert_eq!(evaluate("/ 2".to_string()).unwrap(), 4.5);
+    assert_eq!(evaluate("- .5".to_string()).unwrap(), 4.0);
+    assert_eq!(evaluate("!".to_string()).unwrap(), 24.0);
 }
 
 #[test]
@@ -102,33 +105,33 @@ fn test_nested_factorial() {
 
 #[test]
 fn test_division_by_zero() {
-    assert!(evaluate("5 / 0".to_string()).is_err());
-    assert!(evaluate("0 / 0".to_string()).is_err());
+    assert!(evaluate("5 / 0".to_string()).unwrap().is_nan());
+    assert!(evaluate("0 / 0".to_string()).unwrap().is_nan());
 }
 
 #[test]
 fn test_factorial_edge_cases() {
-    assert!(evaluate("2.5!".to_string()).is_err());
+    assert!(evaluate("2.5!".to_string()).unwrap().is_nan());
     assert!(evaluate("0!".to_string()).unwrap() == 1.0);
 }
 
 #[test]
 fn test_sqrt_negative() {
-    assert!(evaluate("sqrt -1".to_string()).is_err());
-    assert!(evaluate("sqrt -4".to_string()).is_err());
+    assert!(evaluate("sqrt -1".to_string()).unwrap().is_nan());
+    assert!(evaluate("sqrt -4".to_string()).unwrap().is_nan());
 }
 
 #[test]
 fn test_ln_edge_cases() {
-    assert!(evaluate("ln 0".to_string()).is_err());
-    assert!(evaluate("ln -1".to_string()).is_err());
+    assert!(evaluate("ln 0".to_string()).unwrap().is_nan());
+    assert!(evaluate("ln -1".to_string()).unwrap().is_nan());
 }
 
 #[test]
 fn test_log_edge_cases() {
-    assert!(evaluate("10 log 1".to_string()).is_err()); // base 1
-    assert!(evaluate("-10 log 10".to_string()).is_err()); // negative argument
-    assert!(evaluate("10 log -10".to_string()).is_err()); // negative base
+    assert!(evaluate("10 log 1".to_string()).unwrap().is_nan());
+    assert!(evaluate("10 log -10".to_string()).unwrap().is_nan());
+    assert!(evaluate("-10 log 10".to_string()).unwrap().is_nan());
 }
 
 #[test]
@@ -138,6 +141,7 @@ fn test_parsing_errors() {
     assert!(evaluate("2 +".to_string()).is_err()); // incomplete expression
     assert!(evaluate("(2 + 3".to_string()).is_err()); // unmatched parentheses
     assert!(evaluate("2 + 3)".to_string()).is_err()); // extra closing paren
+    assert!(evaluate("3 + 2 -".to_string()).is_err()); // extra closing paren
 }
 
 #[test]
@@ -151,7 +155,10 @@ fn test_large_numbers() {
     // Large factorial - 20! is 2432902008176640000, within u64
     assert_eq!(evaluate("20!".to_string()).unwrap(), 2432902008176640000.0);
     // Large exponentiation
-    assert_eq!(evaluate("2 ^ 100".to_string()).unwrap(), 1.2676506002282294e30);
+    assert_eq!(
+        evaluate("2 ^ 100".to_string()).unwrap(),
+        1.2676506002282294e30
+    );
     // Very large exponent might cause inf
     assert!(evaluate("10 ^ 1000".to_string()).unwrap().is_infinite());
 }
