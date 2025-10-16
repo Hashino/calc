@@ -1,5 +1,3 @@
-// Calculator module: handles evaluation of parsed expressions
-
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 

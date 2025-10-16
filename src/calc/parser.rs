@@ -1,6 +1,3 @@
-// Parser module: tokenizes and parses mathematical expressions into an AST
-
-// Token represents nodes in the expression tree
 pub(super) enum Token {
     Unary(UnaryToken),   // Unary operations like sin, sqrt, !
     Binary(BinaryToken), // Binary operations like +, -, *, /
@@ -8,20 +5,17 @@ pub(super) enum Token {
     LastResult,          // Reference to the last computed result
 }
 
-// Structure for unary operation tokens
 pub(super) struct UnaryToken {
     pub(super) operation: UnaryOperator,
     pub(super) operand: Box<Token>,
 }
 
-// Structure for binary operation tokens
 pub(super) struct BinaryToken {
     pub(super) left: Box<Token>,
     pub(super) operation: BinaryOperator,
     pub(super) right: Box<Token>,
 }
 
-// Enumeration of supported unary operators
 pub(super) enum UnaryOperator {
     Factorial,  // !
     SquareRoot, // sqrt
@@ -31,7 +25,6 @@ pub(super) enum UnaryOperator {
     Ln,         // ln
 }
 
-// Enumeration of supported binary operators
 pub(super) enum BinaryOperator {
     Add,      // +
     Subtract, // -
@@ -42,7 +35,6 @@ pub(super) enum BinaryOperator {
     Log,      // log
 }
 
-// Operator precedence levels for parsing (lower value = higher precedence)
 #[derive(PartialEq, PartialOrd)]
 pub(super) enum Precedence {
     Lowest,
