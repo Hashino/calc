@@ -55,7 +55,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Token, Box<dyn std::error::Error>> {
+    pub(crate) fn parse(&mut self) -> Result<Token, Box<dyn std::error::Error>> {
         let expression = self.parse_expression(Precedence::Lowest)?;
         self.skip_whitespace();
         // Ensure no extra characters remain after parsing
@@ -149,7 +149,7 @@ impl<'a> Parser<'a> {
                 }
                 Ok(expr)
             }
-            _ => Err("Expected number, unary operator, or '(".into()),
+            _ => Err("Unexpected character while parsing primary expression".into()),
         }
     }
 

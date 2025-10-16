@@ -10,10 +10,13 @@ lazy_static! {
 
 // Public function to evaluate a mathematical expression string
 // Parses the input, solves the expression tree, and stores the result
-pub fn evaluate(line: String) -> Result<f64, Box<dyn std::error::Error>> {
+pub fn evaluate(line: String) -> Result<f64, String> {
     let mut parser = Parser::new(&line);
-    let root = parser.parse()?;
-    let result = solve(root)?;
+    let root = match parser.parse() {
+        Ok(token) => token,
+        Err(e) => return Err(format!("Syntax Error: {}", e)),
+    };
+    let result = solve(root);
 
     // Save the result for future use in subsequent expressions
     {
@@ -25,27 +28,32 @@ pub fn evaluate(line: String) -> Result<f64, Box<dyn std::error::Error>> {
 }
 
 // Recursive function to solve/evaluate the expression tree represented by Token
-fn solve(token: Token) -> Result<f64, Box<dyn std::error::Error>> {
+fn solve(token: Token) -> f64 {
     match token {
         Token::Unary(t) => {
             // Evaluate the operand first
-            let operand = solve(*t.operand)?;
+            let operand = solve(*t.operand);
 
             // Apply the unary operation
             let result = match t.operation {
                 UnaryOperator::Factorial => {
                     // Factorial: n! = n * (n-1) * ... * 1, for non-negative integers
                     if operand < 0.0 || operand.fract() != 0.0 {
-                        return Err("Factorial is only defined for non-negative integers".into());
+                        eprintln!("Warning: Factorial of negative or non-integer number");
+                        f64::NAN
+                    } else {
+                        // Compute factorial using product of range
+                        (1..=operand as u64).product::<u64>() as f64
                     }
-                    (1..=operand as u64).product::<u64>() as f64
                 }
                 UnaryOperator::SquareRoot => {
                     // Square root: sqrt(x) = x^(1/2), for non-negative numbers
                     if operand < 0.0 {
-                        return Err("Square root is only defined for non-negative integers".into());
+                        eprintln!("Warning: Square root of negative number encountered");
+                        f64::NAN
+                    } else {
+                        operand.sqrt()
                     }
-                    operand.sqrt()
                 }
                 UnaryOperator::Sin => operand.sin(), // Sine function in radians
                 UnaryOperator::Cos => operand.cos(), // Cosine function in radians
@@ -53,50 +61,56 @@ fn solve(token: Token) -> Result<f64, Box<dyn std::error::Error>> {
                 UnaryOperator::Ln => {
                     // Natural logarithm: ln(x), for positive numbers
                     if operand <= 0.0 {
-                        return Err("Natural logarithm is only defined for positive numbers".into());
+                        eprintln!("Warning: Natural logarithm of non-positive number encountered");
+                        f64::NAN
+                    } else {
+                        operand.ln()
                     }
-                    operand.ln()
                 }
             };
 
-            return Ok(result);
+            result
         }
         Token::Binary(t) => {
-            // Evaluate left and right operands
-            let left = solve(*t.left)?;
-            let right = solve(*t.right)?;
+            let left = solve(*t.left);
+            let right = solve(*t.right);
 
-            // Apply the binary operation
             let result = match t.operation {
-                BinaryOperator::Add => left + right, // Addition
-                BinaryOperator::Subtract => left - right, // Subtraction
-                BinaryOperator::Multiply => left * right, // Multiplication
-                BinaryOperator::Divide => match right { // Division with zero check
-                    0.0 => return Err("Division by zero".into()),
+                BinaryOperator::Add => left + right,
+                BinaryOperator::Subtract => left - right,
+                BinaryOperator::Multiply => left * right,
+                BinaryOperator::Divide => match right {
+                    0.0 => {
+                        eprintln!("Warning: Division by zero encountered");
+                        f64::NAN
+                    }
                     _ => left / right,
                 },
-                BinaryOperator::Power => left.powf(right), // Exponentiation: left^right
-                BinaryOperator::Modulo => left % right, // Modulo operation
+                BinaryOperator::Power => left.powf(right),
+                BinaryOperator::Modulo => left % right,
                 BinaryOperator::Log => {
                     // Logarithm: log_base(right) of left, with domain checks
                     if left <= 0.0 || right <= 0.0 || right == 1.0 {
-                        return Err(
-                            "Logarithm is only defined for positive numbers and base != 1".into(),
-                        );
+                        eprintln!("Warning: Invalid logarithm base or argument");
+                        f64::NAN
+                    } else {
+                        left.log(right)
                     }
-                    left.log(right)
                 }
             };
 
-            return Ok(result);
+            result
         }
-        Token::Value(n) => Ok(n), // Literal number value
+        Token::Value(n) => return n, // Literal number value
         Token::LastResult => {
             // Retrieve the last computed result from global storage
             let last_result = LAST_RESULT.lock().unwrap();
             match *last_result {
-                Some(value) => Ok(value),
-                None => Err("No previous result available".into()),
+                Some(value) => value,
+                None => {
+                    eprintln!("Warning: No last result available");
+                    f64::NAN
+                }
             }
         }
     }
