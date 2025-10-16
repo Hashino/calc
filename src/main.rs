@@ -1,3 +1,4 @@
+// Main module for the calculator CLI application
 use std::{
     io::{BufRead, stdin},
     process::exit,
@@ -5,6 +6,7 @@ use std::{
 
 use crate::calc::calculator::evaluate;
 
+// Module declaration for the calculator logic
 mod calc {
     pub mod calculator;
     pub mod parser;
@@ -13,16 +15,19 @@ mod calc {
     mod tests;
 }
 
+// Using clap for command-line argument parsing
 use clap::Parser;
 
+// Command-line interface structure
 #[derive(Parser)]
 #[command(about, long_about = None)]
 struct Cli {
-    /// evaluates expression  from command line instead of interactive mode
+    /// evaluates expression from command line instead of interactive mode
     #[arg(short, long)]
     input: Option<String>,
 }
 
+// Function to display help information for the interactive mode
 fn show_help() {
     println!("Available commands:");
     println!("help - Show this help message");
@@ -38,9 +43,12 @@ fn show_help() {
     println!("  (2 + 3) * 4    -> 20");
 }
 
+// Main entry point of the application
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Parse command-line arguments
     let cli = Cli::parse();
 
+    // If an input expression is provided via CLI, evaluate it and exit
     if let Some(input) = cli.input.as_deref() {
         match evaluate(input.to_string()) {
             Ok(res) => {
@@ -54,6 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Interactive mode: read lines from stdin and evaluate expressions
     let mut stdin = stdin().lock();
     let mut buffer = String::new();
 
