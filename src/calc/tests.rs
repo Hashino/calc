@@ -1,6 +1,30 @@
 use crate::calc::calculator::evaluate;
 
 #[test]
+fn test_pi_constant() {
+    let result = evaluate("pi".to_string()).unwrap();
+    assert!((result - std::f64::consts::PI).abs() < 1e-10);
+}
+
+#[test]
+fn test_e_constant() {
+    let result = evaluate("e".to_string()).unwrap();
+    assert!((result - std::f64::consts::E).abs() < 1e-10);
+}
+
+#[test]
+fn test_constants_in_expressions() {
+    let result = evaluate("2 * pi".to_string()).unwrap();
+    assert!((result - 2.0 * std::f64::consts::PI).abs() < 1e-10);
+    
+    let result = evaluate("e ^ 2".to_string()).unwrap();
+    assert!((result - std::f64::consts::E.powi(2)).abs() < 1e-10);
+    
+    let result = evaluate("sin pi".to_string()).unwrap();
+    assert!(result.abs() < 1e-10); // sin(π) ≈ 0
+}
+
+#[test]
 fn test_addition() {
     assert_eq!(evaluate("2 + 3".to_string()).unwrap(), 5.0);
 }

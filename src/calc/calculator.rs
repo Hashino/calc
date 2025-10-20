@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use crate::calc::parser::{BinaryOperator, Parser, Token, UnaryOperator};
+use crate::calc::parser::{BinaryOperator, Constant, Parser, Token, UnaryOperator};
 use crate::log::{Level, log};
 
 // Thread-local storage for the last computed result for reuse in expressions
@@ -117,6 +117,13 @@ fn solve(token: Token) -> f64 {
             result
         }
         Token::Value(n) => return n, // Literal number value
+        Token::Constant(c) => {
+            // Mathematical constants
+            match c {
+                Constant::Pi => std::f64::consts::PI,
+                Constant::E => std::f64::consts::E,
+            }
+        }
         Token::LastResult => {
             // Retrieve the last computed result from thread-local storage
             LAST_RESULT.with(|last_result| match *last_result.borrow() {

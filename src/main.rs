@@ -53,6 +53,9 @@ fn show_help() {
     println!("{}", format_example("8 / 2", "4"));
     println!("{}", format_example("(2 + 3) * 4", "20"));
     println!("{}", format_example("sqrt 16", "4"));
+    println!("{}", format_example("sin pi", "0"));
+    println!("{}", format_example("2 * pi", "6.283185"));
+    println!("{}", format_example("e ^ 2", "7.389056"));
     println!("{}", format_example("floor 3.7", "3"));
     println!("{}", format_example("ceil 3.2", "4"));
     println!("{}", format_example("abs (0 - 5)", "5"));

@@ -3,6 +3,12 @@ pub(super) enum Token {
     Binary(BinaryToken), // Binary operations like +, -, *, /
     Value(f64),          // Literal numbers
     LastResult,          // Reference to the last computed result
+    Constant(Constant),  // Mathematical constants like pi, e
+}
+
+pub(super) enum Constant {
+    Pi,
+    E,
 }
 
 pub(super) struct UnaryToken {
@@ -213,6 +219,12 @@ impl<'a> Parser<'a> {
 
     fn parse_unary_operator(&mut self) -> Result<Token, Box<dyn std::error::Error>> {
         let op_str = self.consume_alphabetic_word();
+        
+        // Check if it's a constant first
+        if let Some(constant) = self.parse_constant(&op_str) {
+            return Ok(Token::Constant(constant));
+        }
+        
         let operation = self.parse_unary_operator_type(&op_str)?;
 
         self.skip_whitespace();
@@ -237,6 +249,14 @@ impl<'a> Parser<'a> {
             }
         }
         word
+    }
+
+    fn parse_constant(&self, op_str: &str) -> Option<Constant> {
+        match op_str {
+            "pi" => Some(Constant::Pi),
+            "e" => Some(Constant::E),
+            _ => None,
+        }
     }
 
     fn parse_unary_operator_type(
