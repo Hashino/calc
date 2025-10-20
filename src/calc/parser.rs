@@ -129,11 +129,10 @@ impl<'a> Parser<'a> {
             };
 
             let op_precedence = self.get_precedence(next_char);
-            if op_precedence <= precedence {
-                break;
-            }
 
-            if let Some(operator) = self.parse_binary_operator() {
+            if op_precedence > precedence
+                && let Some(operator) = self.parse_binary_operator()
+            {
                 let right = self.parse_expression(op_precedence)?;
                 left = Token::Binary(BinaryToken {
                     left: Box::new(left),
@@ -219,12 +218,12 @@ impl<'a> Parser<'a> {
 
     fn parse_unary_operator(&mut self) -> Result<Token, Box<dyn std::error::Error>> {
         let op_str = self.consume_alphabetic_word();
-        
+
         // Check if it's a constant first
         if let Some(constant) = self.parse_constant(&op_str) {
             return Ok(Token::Constant(constant));
         }
-        
+
         let operation = self.parse_unary_operator_type(&op_str)?;
 
         self.skip_whitespace();

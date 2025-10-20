@@ -75,13 +75,21 @@ fn main() {
             Err(_) => exit(1),
         }
     } else {
-        let mut editor = DefaultEditor::new().unwrap();
+        let mut editor = DefaultEditor::new().unwrap_or_else(|_| {
+            log(Level::Error, "Failed to initialize line editor");
+            exit(1)
+        });
         let prompt = format!("{} ", ">".purple());
 
         loop {
             match editor.readline(&prompt) {
                 Ok(line) => {
-                    editor.add_history_entry(line.as_str()).unwrap();
+                    if let Err(err) = editor.add_history_entry(line.as_str()) {
+                        log(
+                            Level::Warning,
+                            &format!("Failed to add history entry: {err}"),
+                        );
+                    }
                     match line.trim() {
                         "help" | "h" => show_help(),
                         "quit" | "q" => exit(0),

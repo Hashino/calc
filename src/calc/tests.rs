@@ -16,10 +16,10 @@ fn test_e_constant() {
 fn test_constants_in_expressions() {
     let result = evaluate("2 * pi".to_string()).unwrap();
     assert!((result - 2.0 * std::f64::consts::PI).abs() < 1e-10);
-    
+
     let result = evaluate("e ^ 2".to_string()).unwrap();
     assert!((result - std::f64::consts::E.powi(2)).abs() < 1e-10);
-    
+
     let result = evaluate("sin pi".to_string()).unwrap();
     assert!(result.abs() < 1e-10); // sin(π) ≈ 0
 }
