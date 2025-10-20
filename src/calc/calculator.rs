@@ -1,11 +1,11 @@
-use lazy_static::lazy_static;
-use std::sync::Mutex;
+use std::cell::RefCell;
 
 use crate::calc::parser::{BinaryOperator, Parser, Token, UnaryOperator};
+use crate::log::{Level, log};
 
-// Global static to store the last computed result for reuse in expressions
-lazy_static! {
-    static ref LAST_RESULT: Mutex<Option<f64>> = Mutex::new(None);
+// Thread-local storage for the last computed result for reuse in expressions
+thread_local! {
+    static LAST_RESULT: RefCell<Option<f64>> = RefCell::new(None);
 }
 
 // Public function to evaluate a mathematical expression string
@@ -18,11 +18,15 @@ pub fn evaluate(line: String) -> Result<f64, String> {
     };
     let result = solve(root);
 
-    // Save the result for future use in subsequent expressions
-    {
-        let mut last_result = LAST_RESULT.lock().unwrap();
-        *last_result = Some(result);
+    // Check if result is NaN (indicates an error occurred during calculation)
+    if result.is_nan() {
+        return Err("Mathematical error occurred".to_string());
     }
+
+    // Save the result for future use in subsequent expressions
+    LAST_RESULT.with(|last_result| {
+        *last_result.borrow_mut() = Some(result);
+    });
 
     Ok(result)
 }
@@ -39,7 +43,10 @@ fn solve(token: Token) -> f64 {
                 UnaryOperator::Factorial => {
                     // Factorial: n! = n * (n-1) * ... * 1, for non-negative integers
                     if operand < 0.0 || operand.fract() != 0.0 {
-                        eprintln!("Warning: Factorial of negative or non-integer number");
+                        log(
+                            Level::Warning,
+                            "Factorial of negative or non-integer number",
+                        );
                         f64::NAN
                     } else {
                         // Compute factorial using product of range
@@ -49,7 +56,7 @@ fn solve(token: Token) -> f64 {
                 UnaryOperator::SquareRoot => {
                     // Square root: sqrt(x) = x^(1/2), for non-negative numbers
                     if operand < 0.0 {
-                        eprintln!("Warning: Square root of negative number encountered");
+                        log(Level::Warning, "Square root of negative number encountered");
                         f64::NAN
                     } else {
                         operand.sqrt()
@@ -61,12 +68,20 @@ fn solve(token: Token) -> f64 {
                 UnaryOperator::Ln => {
                     // Natural logarithm: ln(x), for positive numbers
                     if operand <= 0.0 {
-                        eprintln!("Warning: Natural logarithm of non-positive number encountered");
+                        log(
+                            Level::Warning,
+                            "Natural logarithm of non-positive number encountered",
+                        );
                         f64::NAN
                     } else {
                         operand.ln()
                     }
                 }
+                UnaryOperator::Floor => operand.floor(), // Floor: largest integer <= x
+                UnaryOperator::Ceil => operand.ceil(),   // Ceiling: smallest integer >= x
+                UnaryOperator::Abs => operand.abs(),     // Absolute value: |x|
+                UnaryOperator::Round => operand.round(), // Round to nearest integer
+                UnaryOperator::Negate => -operand,       // Unary minus: -x
             };
 
             result
@@ -81,7 +96,7 @@ fn solve(token: Token) -> f64 {
                 BinaryOperator::Multiply => left * right,
                 BinaryOperator::Divide => match right {
                     0.0 => {
-                        eprintln!("Warning: Division by zero encountered");
+                        log(Level::Warning, "Division by zero encountered");
                         f64::NAN
                     }
                     _ => left / right,
@@ -91,7 +106,7 @@ fn solve(token: Token) -> f64 {
                 BinaryOperator::Log => {
                     // Logarithm: log_base(right) of left, with domain checks
                     if left <= 0.0 || right <= 0.0 || right == 1.0 {
-                        eprintln!("Warning: Invalid logarithm base or argument");
+                        log(Level::Warning, "Invalid logarithm base or argument");
                         f64::NAN
                     } else {
                         left.log(right)
@@ -103,15 +118,14 @@ fn solve(token: Token) -> f64 {
         }
         Token::Value(n) => return n, // Literal number value
         Token::LastResult => {
-            // Retrieve the last computed result from global storage
-            let last_result = LAST_RESULT.lock().unwrap();
-            match *last_result {
+            // Retrieve the last computed result from thread-local storage
+            LAST_RESULT.with(|last_result| match *last_result.borrow() {
                 Some(value) => value,
                 None => {
-                    eprintln!("Warning: No last result available");
+                    log(Level::Warning, "No last result available");
                     f64::NAN
                 }
-            }
+            })
         }
     }
 }
