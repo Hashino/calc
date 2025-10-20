@@ -16,4 +16,3 @@ pub fn log(level: Level, message: &str) {
         }
     }
 }
-

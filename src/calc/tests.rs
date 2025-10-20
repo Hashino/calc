@@ -11,6 +11,11 @@ fn test_subtraction() {
 }
 
 #[test]
+fn test_negative() {
+    assert_eq!(evaluate("10 * -1".to_string()).unwrap(), -10.0);
+}
+
+#[test]
 fn test_multiplication() {
     assert_eq!(evaluate("4 * 2".to_string()).unwrap(), 8.0);
 }
@@ -67,10 +72,7 @@ fn test_natural_log() {
 
 #[test]
 fn test_complex_expression() {
-    assert_eq!(
-        evaluate("3 + 5 * 2 - 4 / 2 ^ 2".to_string()).unwrap(),
-        12.0
-    );
+    assert_eq!(evaluate("3 + 5 * 2 - 4 / 2 ^ 2".to_string()).unwrap(), 12.0);
     assert_eq!(evaluate("sqrt 16 + 3 ! - 2 ^ 3".to_string()).unwrap(), 2.0);
     assert_eq!(
         evaluate("10 log 10 + sin 90 * 2".to_string()).unwrap(),
@@ -151,7 +153,50 @@ fn test_large_numbers() {
     // Large factorial - 20! is 2432902008176640000, within u64
     assert_eq!(evaluate("20!".to_string()).unwrap(), 2432902008176640000.0);
     // Large exponentiation
-    assert_eq!(evaluate("2 ^ 100".to_string()).unwrap(), 1.2676506002282294e30);
+    assert_eq!(
+        evaluate("2 ^ 100".to_string()).unwrap(),
+        1.2676506002282294e30
+    );
     // Very large exponent might cause inf
     assert!(evaluate("10 ^ 1000".to_string()).unwrap().is_infinite());
+}
+
+#[test]
+fn test_floor() {
+    assert_eq!(evaluate("floor 3.7".to_string()).unwrap(), 3.0);
+    assert_eq!(evaluate("floor (0 - 2.3)".to_string()).unwrap(), -3.0);
+    assert_eq!(evaluate("floor 5.0".to_string()).unwrap(), 5.0);
+    assert_eq!(evaluate("floor (0 - 5.0)".to_string()).unwrap(), -5.0);
+}
+
+#[test]
+fn test_ceil() {
+    assert_eq!(evaluate("ceil 3.2".to_string()).unwrap(), 4.0);
+    assert_eq!(evaluate("ceil (0 - 2.7)".to_string()).unwrap(), -2.0);
+    assert_eq!(evaluate("ceil 5.0".to_string()).unwrap(), 5.0);
+    assert_eq!(evaluate("ceil (0 - 5.0)".to_string()).unwrap(), -5.0);
+}
+
+#[test]
+fn test_abs() {
+    assert_eq!(evaluate("abs 5".to_string()).unwrap(), 5.0);
+    assert_eq!(evaluate("abs (0 - 5)".to_string()).unwrap(), 5.0);
+    assert_eq!(evaluate("abs 0".to_string()).unwrap(), 0.0);
+    assert_eq!(evaluate("abs (0 - 3.7)".to_string()).unwrap(), 3.7);
+}
+
+#[test]
+fn test_round() {
+    assert_eq!(evaluate("round 3.4".to_string()).unwrap(), 3.0);
+    assert_eq!(evaluate("round 3.6".to_string()).unwrap(), 4.0);
+    assert_eq!(evaluate("round (0 - 2.4)".to_string()).unwrap(), -2.0);
+    assert_eq!(evaluate("round (0 - 2.6)".to_string()).unwrap(), -3.0);
+    assert_eq!(evaluate("round 5.0".to_string()).unwrap(), 5.0);
+}
+
+#[test]
+fn test_new_functions_complex() {
+    assert_eq!(evaluate("abs (floor (0 - 3.7))".to_string()).unwrap(), 4.0);
+    assert_eq!(evaluate("ceil (sqrt 15)".to_string()).unwrap(), 4.0);
+    assert_eq!(evaluate("round 2.5 + 1".to_string()).unwrap(), 4.0);
 }
