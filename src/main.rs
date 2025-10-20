@@ -25,6 +25,15 @@ struct Cli {
     input: Option<String>,
 }
 
+fn format_example(expression: &str, result: &str) -> String {
+    format!(
+        "  {} {} {}",
+        expression.yellow(),
+        "->".blue(),
+        result.green()
+    )
+}
+
 fn show_help() {
     println!("{}", "Available commands:".cyan().bold());
     println!("  {} - {}", "help".green(), "Show this help message");
@@ -38,26 +47,16 @@ fn show_help() {
     );
     println!();
     println!("{}", "Examples:".cyan().bold());
-    println!("  {} {} {}", "2 + 3".yellow(), "->".blue(), "5".green());
-    println!("  {} {} {}", "10 - 4".yellow(), "->".blue(), "6".green());
-    println!("  {} {} {}", "5 * 6".yellow(), "->".blue(), "30".green());
-    println!("  {} {} {}", "8 / 2".yellow(), "->".blue(), "4".green());
-    println!(
-        "  {} {} {}",
-        "(2 + 3) * 4".yellow(),
-        "->".blue(),
-        "20".green()
-    );
-    println!("  {} {} {}", "sqrt 16".yellow(), "->".blue(), "4".green());
-    println!("  {} {} {}", "floor 3.7".yellow(), "->".blue(), "3".green());
-    println!("  {} {} {}", "ceil 3.2".yellow(), "->".blue(), "4".green());
-    println!(
-        "  {} {} {}",
-        "abs (0 - 5)".yellow(),
-        "->".blue(),
-        "5".green()
-    );
-    println!("  {} {} {}", "round 3.6".yellow(), "->".blue(), "4".green());
+    println!("{}", format_example("2 + 3", "5"));
+    println!("{}", format_example("10 - 4", "6"));
+    println!("{}", format_example("5 * 6", "30"));
+    println!("{}", format_example("8 / 2", "4"));
+    println!("{}", format_example("(2 + 3) * 4", "20"));
+    println!("{}", format_example("sqrt 16", "4"));
+    println!("{}", format_example("floor 3.7", "3"));
+    println!("{}", format_example("ceil 3.2", "4"));
+    println!("{}", format_example("abs (0 - 5)", "5"));
+    println!("{}", format_example("round 3.6", "4"));
 }
 
 fn format_result(res: f64) -> String {
