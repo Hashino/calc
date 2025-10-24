@@ -1,21 +1,14 @@
 use std::process::exit;
 
-use crate::calc::calculator::evaluate;
-use crate::log::{Level, log};
-
-mod calc {
-    pub mod calculator;
-    pub mod parser;
-
-    #[cfg(test)]
-    mod tests;
-}
-
+mod calc;
 mod log;
 
 use clap::Parser;
 use colored::Colorize;
 use rustyline::{self, DefaultEditor, error::ReadlineError};
+
+use crate::log::log;
+use crate::{calc::evaluate, log::Level};
 
 #[derive(Parser)]
 #[command(about, long_about = None)]

@@ -1,7 +1,12 @@
 use std::cell::RefCell;
 use std::f64::consts::{E, PI};
 
-use crate::calc::parser::{self, BinaryOperator, Constant, Expr, Operation, UnaryOperator, Value};
+mod lexer;
+mod parser;
+use crate::calc::parser::{BinaryOperator, Constant, Expr, Operation, UnaryOperator, Value};
+
+// #[cfg(test)]
+// mod tests;
 
 // Thread-local storage for the last computed result for reuse in expressions
 thread_local! {

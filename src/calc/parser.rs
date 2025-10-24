@@ -1,4 +1,5 @@
-use std::{error::Error, iter::Peekable, str::Chars};
+use super::lexer::{ConstantType, FunctionType, Lexer, Token};
+use std::error::Error;
 
 pub(super) enum Expr {
     Operation(Operation), // Unary or binary operation
@@ -53,23 +54,22 @@ pub(super) enum BinaryOperator {
 }
 
 pub(super) fn parse(input: &str) -> Result<Expr, Box<dyn Error>> {
-    // let mut parser = Parser::new(input);
-    // parser.parse()
-    Err("Parser not implemented".into())
+    let mut lexer = Lexer::new(input);
+    let tokens = lexer.tokenize()?;
+    let mut parser = Parser::new(tokens);
+    parser.parse()
 }
 
-struct Parser<'a> {
-    chars: Peekable<Chars<'a>>,
+struct Parser {
+    tokens: Vec<Token>,
 }
 
-impl<'a> Parser<'a> {
-    fn new(input: &'a str) -> Self {
-        Self {
-            chars: input.chars().peekable(),
-        }
+impl Parser {
+    fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens }
     }
 
     fn parse(&mut self) -> Result<Expr, Box<dyn Error>> {
-        todo!();
+        todo!("Parser implementation will be added later")
     }
 }
