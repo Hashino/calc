@@ -8,7 +8,7 @@ use colored::Colorize;
 use rustyline::{self, DefaultEditor, error::ReadlineError};
 
 use crate::log::log;
-use crate::{calc::evaluate, log::Level};
+use crate::{calc::Calculator, log::Level};
 
 #[derive(Parser)]
 #[command(about, long_about = None)]
@@ -60,7 +60,7 @@ fn main() {
 
     // If an input expression is provided via CLI, evaluate it and exit
     if let Some(input) = cli.input.as_deref() {
-        if let Ok(res) = evaluate(input.to_string()) {
+        if let Ok(res) = Calculator::evaluate(input.to_string()) {
             println!("{}", format_result(res));
             exit(res.is_normal() as i32);
         } else {
@@ -85,7 +85,7 @@ fn main() {
                         "help" | "h" => show_help(),
                         "quit" | "q" => exit(0),
                         _ => {
-                            match evaluate(line) {
+                            match Calculator::evaluate(line) {
                                 Ok(res) => {
                                     println!("{}", format_result(res));
                                 }

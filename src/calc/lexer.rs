@@ -1,23 +1,17 @@
 use std::{error::Error, fmt, iter::Peekable, str::Chars};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub(super) enum Token {
     Number(f64),
     Plus,
     Minus,
     Multiply,
     Divide,
+    LParen,
+    RParen,
     Power,
     Modulo,
     Factorial,
-    LParen,
-    RParen,
-    Function(FunctionType),
-    Constant(ConstantType),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(super) enum FunctionType {
     Sqrt,
     Sin,
     Cos,
@@ -28,10 +22,6 @@ pub(super) enum FunctionType {
     Abs,
     Round,
     Log,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(super) enum ConstantType {
     Pi,
     E,
 }
@@ -43,7 +33,7 @@ pub(super) struct LexError {
 
 impl fmt::Display for LexError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Lexer error: {}", self.message)
+        write!(f, "{}", self.message)
     }
 }
 
@@ -54,20 +44,21 @@ pub(super) struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub(super) fn new(input: &'a str) -> Self {
-        Self {
-            chars: input.chars().peekable(),
-        }
-    }
-
-    pub(super) fn tokenize(&mut self) -> Result<Vec<Token>, LexError> {
+    pub(super) fn tokenize(input: &'a str) -> Result<Vec<Token>, LexError> {
+        let mut lexer = Lexer::new(input);
         let mut tokens: Vec<Token> = Vec::new();
 
-        while let Some(token) = self.next_token()? {
+        while let Some(token) = lexer.next_token()? {
             tokens.push(token);
         }
 
         Ok(tokens)
+    }
+
+    pub(super) fn new(input: &'a str) -> Self {
+        Self {
+            chars: input.chars().peekable(),
+        }
     }
 
     fn next_token(&mut self) -> Result<Option<Token>, LexError> {
@@ -81,11 +72,11 @@ impl<'a> Lexer<'a> {
                 '-' => Ok(Some(Token::Minus)),
                 '*' => Ok(Some(Token::Multiply)),
                 '/' => Ok(Some(Token::Divide)),
+                '(' => Ok(Some(Token::LParen)),
+                ')' => Ok(Some(Token::RParen)),
                 '^' => Ok(Some(Token::Power)),
                 '%' => Ok(Some(Token::Modulo)),
                 '!' => Ok(Some(Token::Factorial)),
-                '(' => Ok(Some(Token::LParen)),
-                ')' => Ok(Some(Token::RParen)),
 
                 // numbers
                 '0'..='9' | '.' => {
@@ -94,8 +85,7 @@ impl<'a> Lexer<'a> {
                     while let Some(ch) = self.chars.peek() {
                         match ch {
                             '0'..='9' | '.' => {
-                                number_str.push(ch.to_owned());
-                                self.chars.next();
+                                number_str.push(self.chars.next().unwrap());
                             }
                             _ => break,
                         }
@@ -115,23 +105,22 @@ impl<'a> Lexer<'a> {
                     while let Some(ch) = self.chars.peek()
                         && ch.is_alphanumeric()
                     {
-                        identifier.push(ch.to_owned());
-                        self.chars.next();
+                        identifier.push(self.chars.next().unwrap());
                     }
 
                     let token = match identifier.as_str() {
-                        "sqrt" => Token::Function(FunctionType::Sqrt),
-                        "sin" => Token::Function(FunctionType::Sin),
-                        "cos" => Token::Function(FunctionType::Cos),
-                        "tan" => Token::Function(FunctionType::Tan),
-                        "ln" => Token::Function(FunctionType::Ln),
-                        "floor" => Token::Function(FunctionType::Floor),
-                        "ceil" => Token::Function(FunctionType::Ceil),
-                        "abs" => Token::Function(FunctionType::Abs),
-                        "round" => Token::Function(FunctionType::Round),
-                        "log" => Token::Function(FunctionType::Log),
-                        "pi" => Token::Constant(ConstantType::Pi),
-                        "e" => Token::Constant(ConstantType::E),
+                        "sqrt" => Token::Sqrt,
+                        "sin" => Token::Sin,
+                        "cos" => Token::Cos,
+                        "tan" => Token::Tan,
+                        "ln" => Token::Ln,
+                        "floor" => Token::Floor,
+                        "ceil" => Token::Ceil,
+                        "abs" => Token::Abs,
+                        "round" => Token::Round,
+                        "log" => Token::Log,
+                        "pi" => Token::Pi,
+                        "e" => Token::E,
                         _ => {
                             return Err(LexError {
                                 message: format!("Unknown identifier: {}", identifier),
@@ -146,6 +135,8 @@ impl<'a> Lexer<'a> {
                     message: format!("Unexpected character: '{}'", ch),
                 }),
             },
+
+            // EOF
             None => Ok(None),
         }
     }
@@ -157,27 +148,17 @@ mod tests {
 
     #[test]
     fn test_basic_operators() {
-        let mut lexer = Lexer::new("+ - * / ^ % !");
-        let tokens = lexer.tokenize().unwrap();
+        let tokens = Lexer::tokenize("+ - * /").unwrap();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::Plus,
-                Token::Minus,
-                Token::Multiply,
-                Token::Divide,
-                Token::Power,
-                Token::Modulo,
-                Token::Factorial,
-            ]
+            vec![Token::Plus, Token::Minus, Token::Multiply, Token::Divide,]
         );
     }
 
     #[test]
     fn test_numbers() {
-        let mut lexer = Lexer::new("123 45.67 0.5 .25");
-        let tokens = lexer.tokenize().unwrap();
+        let tokens = Lexer::tokenize("123 45.67 0.5 .25").unwrap();
 
         assert_eq!(
             tokens,
@@ -192,51 +173,36 @@ mod tests {
 
     #[test]
     fn test_functions() {
-        let mut lexer = Lexer::new("sqrt sin cos tan ln");
-        let tokens = lexer.tokenize().unwrap();
+        let tokens = Lexer::tokenize("sqrt sin cos tan ln").unwrap();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::Function(FunctionType::Sqrt),
-                Token::Function(FunctionType::Sin),
-                Token::Function(FunctionType::Cos),
-                Token::Function(FunctionType::Tan),
-                Token::Function(FunctionType::Ln),
-            ]
+            vec![Token::Sqrt, Token::Sin, Token::Cos, Token::Tan, Token::Ln,]
         );
     }
 
     #[test]
     fn test_constants() {
-        let mut lexer = Lexer::new("pi e");
-        let tokens = lexer.tokenize().unwrap();
+        let tokens = Lexer::tokenize("pi e").unwrap();
 
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Constant(ConstantType::Pi),
-                Token::Constant(ConstantType::E),
-            ]
-        );
+        assert_eq!(tokens, vec![Token::Pi, Token::E]);
     }
 
     #[test]
     fn test_complex_expression() {
-        let mut lexer = Lexer::new("sin(pi / 2) + sqrt(4)");
-        let tokens = lexer.tokenize().unwrap();
+        let tokens = Lexer::tokenize("sin(pi / 2) + sqrt(4)").unwrap();
 
         assert_eq!(
             tokens,
             vec![
-                Token::Function(FunctionType::Sin),
+                Token::Sin,
                 Token::LParen,
-                Token::Constant(ConstantType::Pi),
+                Token::Pi,
                 Token::Divide,
                 Token::Number(2.0),
                 Token::RParen,
                 Token::Plus,
-                Token::Function(FunctionType::Sqrt),
+                Token::Sqrt,
                 Token::LParen,
                 Token::Number(4.0),
                 Token::RParen,

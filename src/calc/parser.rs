@@ -1,9 +1,9 @@
-use super::lexer::{ConstantType, FunctionType, Lexer, Token};
-use std::error::Error;
+use super::lexer::Token;
+use std::{error::Error, fmt};
 
 pub(super) enum Expr {
-    Operation(Operation), // Unary or binary operation
-    Value(Value),         // Numeric value, constant, or last result
+    Operation(Operation),
+    Value(Value),
 }
 
 pub(super) enum Operation {
@@ -53,23 +53,88 @@ pub(super) enum BinaryOperator {
     Log,      // log
 }
 
-pub(super) fn parse(input: &str) -> Result<Expr, Box<dyn Error>> {
-    let mut lexer = Lexer::new(input);
-    let tokens = lexer.tokenize()?;
-    let mut parser = Parser::new(tokens);
-    parser.parse()
+#[derive(Debug)]
+pub(super) struct ParserError {
+    message: String,
 }
 
-struct Parser {
-    tokens: Vec<Token>,
+impl fmt::Display for ParserError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
 }
+
+impl Error for ParserError {}
+
+pub(super) struct Parser {}
 
 impl Parser {
-    fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens }
+    pub(super) fn parse(tokens: Vec<Token>) -> Result<Expr, ParserError> {
+        Parser::parse_expression(tokens)
     }
 
-    fn parse(&mut self) -> Result<Expr, Box<dyn Error>> {
-        todo!("Parser implementation will be added later")
+    fn parse_expression(mut tokens: Vec<Token>) -> Result<Expr, ParserError> {
+        for i in 0..tokens.len() {
+            match &tokens[i] {
+                Token::Plus => {
+                    let left_tokens: Vec<Token> = tokens.drain(0..i).collect();
+                    let right_tokens: Vec<Token> = tokens.drain(1..).collect();
+
+                    return Ok(Expr::Operation(Operation::Binary {
+                        left: Box::new(Parser::parse_expression(left_tokens)?),
+                        operation: BinaryOperator::Add,
+                        right: Box::new(Parser::parse_expression(right_tokens)?),
+                    }));
+                }
+                Token::Minus => {
+                    let left = Parser::parse_expression(tokens.drain(0..i).collect())?;
+                    let right = Parser::parse_expression(tokens.drain(1..).collect())?;
+
+                    return Ok(Expr::Operation(Operation::Binary {
+                        left: Box::new(left),
+                        operation: BinaryOperator::Subtract,
+                        right: Box::new(right),
+                    }));
+                }
+                _ => continue,
+            }
+        }
+
+        for i in 0..tokens.len() {
+            match &tokens[i] {
+                Token::Multiply => {
+                    let left = Parser::parse_expression(tokens.drain(0..i).collect())?;
+                    let right = Parser::parse_expression(tokens.drain(1..).collect())?;
+
+                    return Ok(Expr::Operation(Operation::Binary {
+                        left: Box::new(left),
+                        operation: BinaryOperator::Multiply,
+                        right: Box::new(right),
+                    }));
+                }
+                Token::Divide => {
+                    let left = Parser::parse_expression(tokens.drain(0..i).collect())?;
+                    let right = Parser::parse_expression(tokens.drain(1..).collect())?;
+
+                    return Ok(Expr::Operation(Operation::Binary {
+                        left: Box::new(left),
+                        operation: BinaryOperator::Divide,
+                        right: Box::new(right),
+                    }));
+                }
+                _ => continue,
+            }
+        }
+
+        for i in 0..tokens.len() {
+            match &tokens[i] {
+                Token::Number(value) => return Ok(Expr::Value(Value::Number(*value))),
+                _ => continue,
+            }
+        }
+
+        Err(ParserError {
+            message: "Parsing not fully implemented".into(),
+        })
     }
 }
