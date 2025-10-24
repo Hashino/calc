@@ -67,28 +67,26 @@ fn main() {
 
     // If an input expression is provided via CLI, evaluate it and exit
     if let Some(input) = cli.input.as_deref() {
-        match evaluate(input.to_string()) {
-            Ok(res) => {
-                println!("{}", format_result(res));
-                exit(!res.is_nan() as i32);
-            }
-            Err(_) => exit(1),
+        if let Ok(res) = evaluate(input.to_string()) {
+            println!("{}", format_result(res));
+            exit(res.is_normal() as i32);
+        } else {
+            exit(1);
         }
-    } else {
+    }
+    // Otherwise, enter interactive REPL mode
+    else {
+        let prompt = format!("{} ", ">".purple());
         let mut editor = DefaultEditor::new().unwrap_or_else(|_| {
             log(Level::Error, "Failed to initialize line editor");
             exit(1)
         });
-        let prompt = format!("{} ", ">".purple());
 
         loop {
             match editor.readline(&prompt) {
                 Ok(line) => {
-                    if let Err(err) = editor.add_history_entry(line.as_str()) {
-                        log(
-                            Level::Warning,
-                            &format!("Failed to add history entry: {err}"),
-                        );
+                    if let Err(e) = editor.add_history_entry(line.as_str()) {
+                        log(Level::Warning, &format!("Failed to add history entry: {e}"));
                     }
                     match line.trim() {
                         "help" | "h" => show_help(),

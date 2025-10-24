@@ -1,7 +1,7 @@
 use std::cell::RefCell;
+use std::f64::consts::{E, PI};
 
-use crate::calc::parser::{BinaryOperator, Constant, Parser, Token, UnaryOperator};
-use crate::log::{Level, log};
+use crate::calc::parser::{self, BinaryOperator, Constant, Expr, Operation, UnaryOperator, Value};
 
 // Thread-local storage for the last computed result for reuse in expressions
 thread_local! {
@@ -11,128 +11,111 @@ thread_local! {
 // Public function to evaluate a mathematical expression string
 // Parses the input, solves the expression tree, and stores the result
 pub fn evaluate(line: String) -> Result<f64, String> {
-    let mut parser = Parser::new(&line);
-    let root = match parser.parse() {
-        Ok(token) => token,
-        Err(e) => return Err(format!("Syntax Error: {}", e)),
-    };
-    let result = solve(root);
-
-    // Check if result is NaN (indicates an error occurred during calculation)
-    if result.is_nan() {
-        return Err("Mathematical error occurred".to_string());
-    }
+    let root = parser::parse(&line).map_err(|e| format!("Parse Error: {}", e))?;
+    let result = solve(root).map_err(|e| format!("Evaluation Error: {}", e))?;
 
     // Save the result for future use in subsequent expressions
-    LAST_RESULT.with(|last_result| {
-        *last_result.borrow_mut() = Some(result);
-    });
+    LAST_RESULT.set(Some(result));
 
     Ok(result)
 }
 
 // Recursive function to solve/evaluate the expression tree represented by Token
-fn solve(token: Token) -> f64 {
+fn solve(token: Expr) -> Result<f64, String> {
     match token {
-        Token::Unary(t) => {
-            // Evaluate the operand first
-            let operand = solve(*t.operand);
+        Expr::Operation(op) => match op {
+            Operation::Unary { operation, operand } => {
+                // Evaluate the operand first
+                let op = solve(*operand)?;
 
-            // Apply the unary operation
-            let result = match t.operation {
-                UnaryOperator::Factorial => {
-                    // Factorial: n! = n * (n-1) * ... * 1, for non-negative integers
-                    if operand < 0.0 || operand.fract() != 0.0 {
-                        log(
-                            Level::Warning,
-                            "Factorial of negative or non-integer number",
-                        );
-                        f64::NAN
-                    } else {
-                        // Compute factorial using product of range
-                        (1..=operand as u64).product::<u64>() as f64
+                // Apply the unary operation
+                match operation {
+                    UnaryOperator::Factorial => {
+                        // Factorial: n! = n * (n-1) * ... * 1, for non-negative integers
+                        if op < 0.0 || op.fract() != 0.0 {
+                            Err("Factorial of negative or non-integer number".into())
+                        } else {
+                            // Compute factorial using product of range
+                            Ok((1..=op as u64).product::<u64>() as f64)
+                        }
                     }
+                    UnaryOperator::SquareRoot => {
+                        // Square root: sqrt(x) = x^(1/2), for non-negative numbers
+                        if op < 0.0 {
+                            Err("Square root of negative number encountered".into())
+                        } else {
+                            Ok(op.sqrt())
+                        }
+                    }
+                    UnaryOperator::Sin => Ok(op.sin()),
+                    UnaryOperator::Cos => Ok(op.cos()),
+                    UnaryOperator::Tan => Ok(op.tan()),
+                    UnaryOperator::Ln => {
+                        // Natural logarithm: ln(x), for positive numbers
+                        if op <= 0.0 {
+                            Err("Natural logarithm of non-positive number encountered".into())
+                        } else {
+                            Ok(op.ln())
+                        }
+                    }
+                    UnaryOperator::Floor => Ok(op.floor()),
+                    UnaryOperator::Ceil => Ok(op.ceil()),
+                    UnaryOperator::Abs => Ok(op.abs()),
+                    UnaryOperator::Round => Ok(op.round()),
+                    UnaryOperator::Negate => Ok(-op),
                 }
-                UnaryOperator::SquareRoot => {
-                    // Square root: sqrt(x) = x^(1/2), for non-negative numbers
-                    if operand < 0.0 {
-                        log(Level::Warning, "Square root of negative number encountered");
-                        f64::NAN
-                    } else {
-                        operand.sqrt()
-                    }
-                }
-                UnaryOperator::Sin => operand.sin(), // Sine function in radians
-                UnaryOperator::Cos => operand.cos(), // Cosine function in radians
-                UnaryOperator::Tan => operand.tan(), // Tangent function in radians
-                UnaryOperator::Ln => {
-                    // Natural logarithm: ln(x), for positive numbers
-                    if operand <= 0.0 {
-                        log(
-                            Level::Warning,
-                            "Natural logarithm of non-positive number encountered",
-                        );
-                        f64::NAN
-                    } else {
-                        operand.ln()
-                    }
-                }
-                UnaryOperator::Floor => operand.floor(), // Floor: largest integer <= x
-                UnaryOperator::Ceil => operand.ceil(),   // Ceiling: smallest integer >= x
-                UnaryOperator::Abs => operand.abs(),     // Absolute value: |x|
-                UnaryOperator::Round => operand.round(), // Round to nearest integer
-                UnaryOperator::Negate => -operand,       // Unary minus: -x
-            };
-
-            result
-        }
-        Token::Binary(t) => {
-            let left = solve(*t.left);
-            let right = solve(*t.right);
-
-            let result = match t.operation {
-                BinaryOperator::Add => left + right,
-                BinaryOperator::Subtract => left - right,
-                BinaryOperator::Multiply => left * right,
-                BinaryOperator::Divide => match right {
-                    0.0 => {
-                        log(Level::Warning, "Division by zero encountered");
-                        f64::NAN
-                    }
-                    _ => left / right,
-                },
-                BinaryOperator::Power => left.powf(right),
-                BinaryOperator::Modulo => left % right,
-                BinaryOperator::Log => {
-                    // Logarithm: log_base(right) of left, with domain checks
-                    if left <= 0.0 || right <= 0.0 || right == 1.0 {
-                        log(Level::Warning, "Invalid logarithm base or argument");
-                        f64::NAN
-                    } else {
-                        left.log(right)
-                    }
-                }
-            };
-
-            result
-        }
-        Token::Value(n) => return n, // Literal number value
-        Token::Constant(c) => {
-            // Mathematical constants
-            match c {
-                Constant::Pi => std::f64::consts::PI,
-                Constant::E => std::f64::consts::E,
             }
-        }
-        Token::LastResult => {
-            // Retrieve the last computed result from thread-local storage
-            LAST_RESULT.with(|last_result| match *last_result.borrow() {
-                Some(value) => value,
-                None => {
-                    log(Level::Warning, "No last result available");
-                    f64::NAN
+            Operation::Binary {
+                left,
+                operation,
+                right,
+            } => {
+                let left = solve(*left)?;
+                let right = solve(*right)?;
+
+                match operation {
+                    BinaryOperator::Add => Ok(left + right),
+                    BinaryOperator::Subtract => Ok(left - right),
+                    BinaryOperator::Multiply => Ok(left * right),
+                    BinaryOperator::Divide => {
+                        if right == 0.0 {
+                            Err("Division by zero encountered".into())
+                        } else {
+                            Ok(left / right)
+                        }
+                    } //
+                    BinaryOperator::Power => Ok(left.powf(right)),
+                    BinaryOperator::Modulo => {
+                        if right == 0.0 {
+                            Err("Modulo by zero encountered".into())
+                        } else {
+                            Ok(left % right)
+                        }
+                    }
+                    BinaryOperator::Log => {
+                        // Logarithm: log_base(right) of left, with domain checks
+                        if left <= 0.0 || right <= 0.0 || right == 1.0 {
+                            Err("Invalid logarithm base or argument".into())
+                        } else {
+                            Ok(left.log(right))
+                        }
+                    }
                 }
-            })
-        }
+            }
+        },
+        Expr::Value(v) => match v {
+            Value::Number(n) => Ok(n), // Literal number value
+            Value::Constant(c) => {
+                // Mathematical constants
+                match c {
+                    Constant::Pi => Ok(PI),
+                    Constant::E => Ok(E),
+                }
+            }
+            Value::LastResult => {
+                // Retrieve the last computed result from thread-local storage
+                LAST_RESULT.with_borrow(|lr| lr.ok_or_else(|| "No last result available".into()))
+            }
+        },
     }
 }
