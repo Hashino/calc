@@ -16,6 +16,10 @@ struct Cli {
     /// evaluates expression from command line instead of interactive mode
     #[arg(short, long)]
     input: Option<String>,
+
+    /// enables debug mode to print the expression AST
+    #[arg(short, long, default_value_t = false)]
+    debug: bool,
 }
 
 fn format_example(expression: &str, result: &str) -> String {
@@ -69,6 +73,8 @@ fn main() {
     }
     // Otherwise, enter interactive REPL mode
     else {
+        let debug = cli.debug;
+
         let prompt = format!("{} ", ">".purple());
         let mut editor = DefaultEditor::new().unwrap_or_else(|_| {
             log(Level::Error, "Failed to initialize line editor");
@@ -85,7 +91,7 @@ fn main() {
                         "help" | "h" => show_help(),
                         "quit" | "q" => exit(0),
                         _ => {
-                            match Calculator::evaluate(line) {
+                            match Calculator::evaluate_with_debug(line, debug) {
                                 Ok(res) => {
                                     println!("{}", format_result(res));
                                 }

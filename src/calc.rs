@@ -16,6 +16,32 @@ thread_local! {
     static LAST_RESULT: RefCell<Option<f64>> = RefCell::new(None);
 }
 
+fn print_ast(token: &Expr, depth: usize) {
+    let indent = "  ".repeat(depth);
+    match token {
+        Expr::Operation(op) => match op {
+            Operation::Unary { operation, operand } => {
+                println!("{}Unary ({:?})", indent, operation);
+                print_ast(operand, depth + 1);
+            }
+            Operation::Binary {
+                left,
+                operation,
+                right,
+            } => {
+                println!("{}Binary ({:?})", indent, operation);
+                print_ast(left, depth + 1);
+                print_ast(right, depth + 1);
+            }
+        },
+        Expr::Value(v) => match v {
+            Value::Number(n) => println!("{}Number({})", indent, n),
+            Value::Constant(c) => println!("{}Constant: {:?}", indent, c),
+            Value::LastResult => println!("{}Last Result", indent),
+        },
+    }
+}
+
 pub struct Calculator;
 
 impl Calculator {
@@ -24,6 +50,22 @@ impl Calculator {
     pub fn evaluate(line: String) -> Result<f64, String> {
         let tokens = Lexer::tokenize(&line).map_err(|e| format!("Lexing Error: {}", e))?;
         let root = Parser::parse(tokens).map_err(|e| format!("Parsing Error: {}", e))?;
+
+        let result = Calculator::solve(root).map_err(|e| format!("Evaluation Error: {}", e))?;
+
+        // Save the result for future use in subsequent expressions
+        LAST_RESULT.set(Some(result));
+
+        Ok(result)
+    }
+
+    pub fn evaluate_with_debug(line: String, debug: bool) -> Result<f64, String> {
+        let tokens = Lexer::tokenize(&line).map_err(|e| format!("Lexing Error: {}", e))?;
+        let root = Parser::parse(tokens).map_err(|e| format!("Parsing Error: {}", e))?;
+
+        if debug {
+            print_ast(&root, 0);
+        }
 
         let result = Calculator::solve(root).map_err(|e| format!("Evaluation Error: {}", e))?;
 
