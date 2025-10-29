@@ -33,11 +33,15 @@ fn test_parentheses() {
     );
 }
 
-// #[test]
-// fn test_negative() {
-//     assert_eq!(Calculator::evaluate("10 * -1".to_string()).unwrap(), -10.0);
-// }
-//
+#[test]
+fn test_negative() {
+    assert_eq!(Calculator::evaluate("10 * -1".to_string()).unwrap(), -10.0);
+    assert_eq!(
+        Calculator::evaluate("5 * -2 + 3".to_string()).unwrap(),
+        -7.0
+    );
+}
+
 // #[test]
 // fn test_exponentiation() {
 //     assert_eq!(Calculator::evaluate("2 ^ 3".to_string()).unwrap(), 8.0);

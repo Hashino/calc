@@ -48,8 +48,8 @@ impl Calculator {
     // Public function to evaluate a mathematical expression string
     // Parses the input, solves the expression tree, and stores the result
     pub fn evaluate(line: String) -> Result<f64, String> {
-        let tokens = Lexer::tokenize(&line).map_err(|e| format!("Lexing Error: {}", e))?;
-        let root = Parser::parse(tokens).map_err(|e| format!("Parsing Error: {}", e))?;
+        let mut tokens = Lexer::tokenize(&line).map_err(|e| format!("Lexing Error: {}", e))?;
+        let root = Parser::parse(&mut tokens).map_err(|e| format!("Parsing Error: {}", e))?;
 
         let result = Calculator::solve(root).map_err(|e| format!("Evaluation Error: {}", e))?;
 
@@ -60,8 +60,8 @@ impl Calculator {
     }
 
     pub fn evaluate_with_debug(line: String, debug: bool) -> Result<f64, String> {
-        let tokens = Lexer::tokenize(&line).map_err(|e| format!("Lexing Error: {}", e))?;
-        let root = Parser::parse(tokens).map_err(|e| format!("Parsing Error: {}", e))?;
+        let mut tokens = Lexer::tokenize(&line).map_err(|e| format!("Lexing Error: {}", e))?;
+        let root = Parser::parse(&mut tokens).map_err(|e| format!("Parsing Error: {}", e))?;
 
         if debug {
             print_ast(&root, 0);
