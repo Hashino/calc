@@ -76,100 +76,10 @@ pub(super) struct Parser {}
 
 impl Parser {
     pub(super) fn parse(tokens: &mut Vec<Token>) -> Result<Expr, ParserError> {
-        Parser::parse_first(&mut tokens.iter().peekable())
+        Parser::parse_expression(&mut tokens.iter().peekable())
     }
 
-    fn parse_first(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, ParserError> {
-        let left = Parser::parse_second(tokens)?;
-
-        while let Some(token) = tokens.peek() {
-            match token {
-                Token::Plus => {
-                    tokens.next();
-                    let right = Parser::parse_second(tokens)?;
-
-                    return Ok(Expr::Operation(Operation::Binary {
-                        left: Box::new(left),
-                        operation: BinaryOperator::Add,
-                        right: Box::new(right),
-                    }));
-                }
-                Token::Minus => {
-                    tokens.next();
-                    let right = Parser::parse_second(tokens)?;
-
-                    return Ok(Expr::Operation(Operation::Binary {
-                        left: Box::new(left),
-                        operation: BinaryOperator::Subtract,
-                        right: Box::new(right),
-                    }));
-                }
-                _ => break,
-            }
-        }
-
-        Ok(left)
-    }
-
-    fn parse_second(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, ParserError> {
-        let left = Parser::parse_final(tokens)?;
-
-        while let Some(token) = tokens.peek() {
-            match token {
-                Token::Multiply => {
-                    tokens.next();
-                    let right = Parser::parse_final(tokens)?;
-
-                    return Ok(Expr::Operation(Operation::Binary {
-                        left: Box::new(left),
-                        operation: BinaryOperator::Multiply,
-                        right: Box::new(right),
-                    }));
-                }
-                Token::Divide => {
-                    tokens.next();
-                    let right = Parser::parse_final(tokens)?;
-
-                    return Ok(Expr::Operation(Operation::Binary {
-                        left: Box::new(left),
-                        operation: BinaryOperator::Divide,
-                        right: Box::new(right),
-                    }));
-                }
-                _ => break,
-            }
-        }
-
-        Ok(left)
-    }
-
-    fn parse_final(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, ParserError> {
-        match tokens.next() {
-            Some(Token::Number(n)) => Ok(Expr::Value(Value::Number(*n))),
-            Some(Token::LParen) => {
-                let expr = Parser::parse_first(tokens)?;
-
-                match tokens.next() {
-                    Some(Token::RParen) => Ok(expr),
-                    _ => Err(ParserError {
-                        message: String::from("Expected closing parenthesis"),
-                    }),
-                }
-            }
-            Some(Token::Minus) => {
-                let right = Parser::parse_final(tokens)?;
-
-                return Ok(Expr::Operation(Operation::Unary {
-                    operation: UnaryOperator::Negate,
-                    operand: Box::new(right),
-                }));
-            }
-            Some(token) => Err(ParserError {
-                message: format!("Unexpected token: {:?}", token),
-            }),
-            None => Err(ParserError {
-                message: String::from("Unexpected end of input"),
-            }),
-        }
+    fn parse_expression(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, ParserError> {
+        todo!()
     }
 }

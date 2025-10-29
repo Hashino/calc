@@ -1,45 +1,76 @@
 use super::Calculator;
 
+enum Expect {
+    Val(f64),
+    Err,
+}
+
+// auxiliary function for tests
+fn eval(lhs: &str, rhs: Expect) -> bool {
+    match Calculator::evaluate(lhs.to_string()) {
+        Ok(result) => match rhs {
+            Expect::Val(expected) => result == expected,
+            Expect::Err => false,
+        },
+        Err(_) => matches!(rhs, Expect::Err),
+    }
+}
+
+#[test]
+fn test_simple_number() {
+    assert!(eval("42", Expect::Val(42.0)));
+    assert!(eval("-3.14", Expect::Val(-3.14)));
+}
+
 #[test]
 fn test_addition() {
-    assert_eq!(Calculator::evaluate("2 + 3".to_string()).unwrap(), 5.0);
+    assert!(eval("2 + 3", Expect::Val(5.0)));
+    assert!(eval("1 + 2 + 3", Expect::Val(6.0)));
 }
 
 #[test]
 fn test_subtraction() {
-    assert_eq!(Calculator::evaluate("5 - 3".to_string()).unwrap(), 2.0);
+    assert!(eval("5 - 3", Expect::Val(2.0)));
+    assert!(eval("10 - 2 - 3", Expect::Val(5.0)));
 }
 
 #[test]
 fn test_multiplication() {
-    assert_eq!(Calculator::evaluate("4 * 2".to_string()).unwrap(), 8.0);
+    assert!(eval("4 * 2", Expect::Val(8.0)));
+    assert!(eval("3 * 4 * 2", Expect::Val(24.0)));
 }
 
 #[test]
 fn test_division() {
-    assert_eq!(Calculator::evaluate("8 / 2".to_string()).unwrap(), 4.0);
+    assert!(eval("8 / 2", Expect::Val(4.0)));
+    assert!(eval("20 / 2 / 5", Expect::Val(2.0)));
 }
 
 #[test]
 fn test_precedence() {
-    assert_eq!(Calculator::evaluate("2 + 3 * 4".to_string()).unwrap(), 14.0);
+    assert!(eval("2 + 3 * 4", Expect::Val(14.0)));
+    assert!(eval("10 - 2 / 2", Expect::Val(9.0)));
 }
 
 #[test]
 fn test_parentheses() {
-    assert_eq!(
-        Calculator::evaluate("(2 + 3) * 4".to_string()).unwrap(),
-        20.0
-    );
+    assert!(eval(" (2 + 3) * 4 ", Expect::Val(20.0)));
+    assert!(eval("10 / (2 + 3)", Expect::Val(2.0)));
 }
 
 #[test]
 fn test_negative() {
-    assert_eq!(Calculator::evaluate("10 * -1".to_string()).unwrap(), -10.0);
-    assert_eq!(
-        Calculator::evaluate("5 * -2 + 3".to_string()).unwrap(),
-        -7.0
-    );
+    assert!(eval("10 * -1", Expect::Val(-10.0)));
+    assert!(eval("5 * -2 + 3", Expect::Val(-7.0)));
+}
+
+#[test]
+fn test_parsing_errors() {
+    assert!(eval("", Expect::Err));
+    assert!(eval("abc", Expect::Err));
+    assert!(eval("2 +", Expect::Err));
+    assert!(eval("(2 + 3", Expect::Err));
+    assert!(eval("2 + 3)", Expect::Err));
 }
 
 // #[test]
@@ -167,16 +198,6 @@ fn test_negative() {
 //     assert!(Calculator::evaluate("-10 log 10".to_string()).is_err()); // negative argument
 //     assert!(Calculator::evaluate("10 log -10".to_string()).is_err()); // negative base
 // }
-//
-// #[test]
-// fn test_parsing_errors() {
-//     assert!(Calculator::evaluate("".to_string()).is_err()); // empty string
-//     assert!(Calculator::evaluate("abc".to_string()).is_err()); // invalid characters
-//     assert!(Calculator::evaluate("2 +".to_string()).is_err()); // incomplete expression
-//     assert!(Calculator::evaluate("(2 + 3".to_string()).is_err()); // unmatched parentheses
-//     assert!(Calculator::evaluate("2 + 3)".to_string()).is_err()); // extra closing paren
-// }
-//
 // #[test]
 // fn test_modulo_edge_cases() {
 //     assert_eq!(Calculator::evaluate("7 % 3".to_string()).unwrap(), 1.0);
