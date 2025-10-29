@@ -84,8 +84,8 @@ fn main() {
         loop {
             match editor.readline(&prompt) {
                 Ok(line) => {
-                    if let Err(e) = editor.add_history_entry(line.as_str()) {
-                        log(Level::Warning, &format!("Failed to add history entry: {e}"));
+                    if let Err(err) = editor.add_history_entry(line.as_str()) {
+                        log( Level::Warning, format!("Failed to add history entry: {err}"));
                     }
                     match line.trim() {
                         "help" | "h" => show_help(),
@@ -96,7 +96,7 @@ fn main() {
                                     println!("{}", format_result(res));
                                 }
                                 Err(e) => {
-                                    log(Level::Error, &format!("{:?}", e));
+                                    log(Level::Error, e);
                                     continue;
                                 }
                             };
@@ -107,7 +107,7 @@ fn main() {
                     exit(0);
                 }
                 Err(err) => {
-                    log(Level::Error, &format!("Error reading input: {err}"));
+                    log(Level::Error, format!("Error reading input: {err}"));
                     exit(1);
                 }
             }

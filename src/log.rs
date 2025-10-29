@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use colored::Colorize;
 
 #[derive(Debug, Clone, Copy)]
@@ -6,13 +8,13 @@ pub enum Level {
     Error,
 }
 
-pub fn log(level: Level, message: &str) {
+pub fn log<T: Display>(level: Level, message: T) {
     match level {
         Level::Error => {
-            eprintln!("{}", format!("ERROR: {}", message).red());
+            eprintln!("{} {message}", "ERROR:".red());
         }
         Level::Warning => {
-            eprintln!("{}", format!("WARN: {}", message).yellow());
+            eprintln!("{} {message}", "WARNING:".yellow());
         }
     }
 }
