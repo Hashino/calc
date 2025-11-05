@@ -1,14 +1,16 @@
 use std::process::exit;
 
+use clap::Parser;
+use colored::Colorize;
+use rustyline::{DefaultEditor, error::ReadlineError};
+
 mod calc;
 mod log;
 
-use clap::Parser;
-use colored::Colorize;
-use rustyline::{self, DefaultEditor, error::ReadlineError};
-
-use crate::log::log;
-use crate::{calc::Calculator, log::Level};
+use crate::{
+    calc::ErrorKind,
+    log::{Level, log},
+};
 
 #[derive(Parser)]
 #[command(about, long_about = None)]
@@ -16,10 +18,6 @@ struct Cli {
     /// evaluates expression from command line instead of interactive mode
     #[arg(short, long)]
     input: Option<String>,
-
-    /// enables debug mode to print the expression AST
-    #[arg(short, long, default_value_t = false)]
-    debug: bool,
 }
 
 fn format_example(expression: &str, result: &str) -> String {
@@ -53,9 +51,10 @@ fn show_help() {
 }
 
 fn format_result(res: f64) -> String {
-    match res {
-        r if r.fract() == 0.0 => format!("{}", r as i64),
-        r => format!("{}", r),
+    if res.fract() == 0.0 {
+        return format!("{}", res as i64);
+    } else {
+        return format!("{}", res);
     }
 }
 
@@ -64,7 +63,7 @@ fn main() {
 
     // If an input expression is provided via CLI, evaluate it and exit
     if let Some(input) = cli.input.as_deref() {
-        if let Ok(res) = Calculator::evaluate(input.to_string()) {
+        if let Ok(res) = calc::evaluate(input.to_string()) {
             println!("{}", format_result(res));
             exit(res.is_normal() as i32);
         } else {
@@ -73,9 +72,8 @@ fn main() {
     }
     // Otherwise, enter interactive REPL mode
     else {
-        let debug = cli.debug;
-
         let prompt = format!("{} ", ">".purple());
+
         let mut editor = DefaultEditor::new().unwrap_or_else(|_| {
             log(Level::Error, "Failed to initialize line editor");
             exit(1)
@@ -84,30 +82,37 @@ fn main() {
         loop {
             match editor.readline(&prompt) {
                 Ok(line) => {
-                    if let Err(e) = editor.add_history_entry(line.as_str()) {
-                        log(Level::Warning, &format!("Failed to add history entry: {e}"));
-                    }
+                    let _ = editor.add_history_entry(line.as_str());
+
                     match line.trim() {
                         "help" | "h" => show_help(),
                         "quit" | "q" => exit(0),
                         _ => {
-                            match Calculator::evaluate_with_debug(line, debug) {
+                            match calc::evaluate(line) {
                                 Ok(res) => {
                                     println!("{}", format_result(res));
                                 }
-                                Err(e) => {
-                                    log(Level::Error, &format!("{:?}", e));
-                                    continue;
-                                }
+                                Err(e) => match e.kind {
+                                    ErrorKind::Syntactic => {
+                                        log(Level::Error, format!("Syntax Error: {}", e.message));
+                                    }
+                                    ErrorKind::Mathematical => {
+                                        log(Level::Warning, e.message);
+                                    }
+                                },
                             };
                         }
                     }
                 }
+
+                // user pressed Ctrl+C or Ctrl+D
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
                     exit(0);
                 }
+
+                // unexpected error
                 Err(err) => {
-                    log(Level::Error, &format!("Error reading input: {err}"));
+                    log(Level::Error, format!("Error reading input: {err}"));
                     exit(1);
                 }
             }

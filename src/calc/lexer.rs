@@ -1,6 +1,6 @@
-use std::{error::Error, fmt, iter::Peekable, str::Chars};
+use std::{iter::Peekable, str::Chars};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(super) enum Token {
     Number(f64),
     Plus,
@@ -26,25 +26,12 @@ pub(super) enum Token {
     E,
 }
 
-#[derive(Debug)]
-pub(super) struct LexError {
-    message: String,
-}
-
-impl fmt::Display for LexError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl Error for LexError {}
-
 pub(super) struct Lexer<'a> {
     chars: Peekable<Chars<'a>>,
 }
 
 impl<'a> Lexer<'a> {
-    pub(super) fn tokenize(input: &'a str) -> Result<Vec<Token>, LexError> {
+    pub(super) fn tokenize(input: &'a str) -> Result<Vec<Token>, String> {
         let mut lexer = Lexer::new(input);
         let mut tokens: Vec<Token> = Vec::new();
 
@@ -61,7 +48,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn next_token(&mut self) -> Result<Option<Token>, LexError> {
+    fn next_token(&mut self) -> Result<Option<Token>, String> {
         match self.chars.next() {
             Some(ch) => match ch {
                 // skip whitespace
@@ -91,9 +78,9 @@ impl<'a> Lexer<'a> {
                         }
                     }
 
-                    let value = number_str.parse::<f64>().map_err(|_| LexError {
-                        message: format!("Invalid number: {}", number_str),
-                    })?;
+                    let value = number_str
+                        .parse::<f64>()
+                        .map_err(|_| format!("Invalid number: {}", number_str))?;
 
                     Ok(Some(Token::Number(value)))
                 }
@@ -122,18 +109,14 @@ impl<'a> Lexer<'a> {
                         "pi" => Token::Pi,
                         "e" => Token::E,
                         _ => {
-                            return Err(LexError {
-                                message: format!("Unknown identifier: {}", identifier),
-                            });
+                            return Err(format!("Unknown identifier: {}", identifier));
                         }
                     };
 
                     Ok(Some(token))
                 }
 
-                _ => Err(LexError {
-                    message: format!("Unexpected character: '{}'", ch),
-                }),
+                _ => Err(format!("Unexpected character: '{}'", ch)),
             },
 
             // EOF

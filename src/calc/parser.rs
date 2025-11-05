@@ -1,11 +1,15 @@
-use super::lexer::Token;
-use std::{error::Error, fmt};
+use crate::calc::lexer::{self, Lexer};
 
+use super::lexer::Token;
+use std::{error::Error, fmt, iter::Peekable, vec::IntoIter};
+
+#[derive(Debug)]
 pub(super) enum Expr {
     Operation(Operation),
     Value(Value),
 }
 
+#[derive(Debug)]
 pub(super) enum Operation {
     Unary {
         operation: UnaryOperator,
@@ -18,6 +22,7 @@ pub(super) enum Operation {
     },
 }
 
+#[derive(Debug)]
 pub(super) enum Value {
     Number(f64),
     Constant(Constant),
@@ -56,27 +61,36 @@ pub(super) enum BinaryOperator {
     Log,      // log
 }
 
-#[derive(Debug)]
-pub(super) struct ParserError {
-    message: String,
+pub(super) struct Parser {
+    tokens: Peekable<IntoIter<Token>>,
 }
-
-impl fmt::Display for ParserError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl Error for ParserError {}
-
-pub(super) struct Parser {}
 
 impl Parser {
-    pub(super) fn parse(tokens: Vec<Token>) -> Result<Expr, ParserError> {
-        Parser::parse_expression(tokens)
+    fn new(tokens: Vec<Token>) -> Self {
+        Parser {
+            tokens: tokens.into_iter().peekable(),
+        }
     }
 
-    fn parse_expression(mut tokens: Vec<Token>) -> Result<Expr, ParserError> {
+    pub(super) fn parse(line: &str) -> Result<Expr, String> {
+        let tokens = Lexer::tokenize(line)?;
+
+        if tokens.is_empty() {
+            return Err("Empty expression".into());
+        }
+
+        let mut parser = Parser::new(tokens.clone());
+
+        let result = parser.parse_expression()?;
+
+        if parser.tokens.peek().is_some() {
+            return Err("Unexpected tokens after expression".into());
+        }
+
+        Ok(result)
+    }
+
+    fn parse_expression(&mut self) -> Result<Expr, String> {
         todo!()
     }
 }

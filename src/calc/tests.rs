@@ -1,11 +1,11 @@
-use super::Calculator;
+use crate::calc;
 
 fn eval(expression: &str) -> f64 {
-    Calculator::evaluate(expression.to_string()).unwrap()
+    calc::evaluate(expression.to_string()).unwrap()
 }
 
 fn eval_err(expression: &str) -> bool {
-    Calculator::evaluate(expression.to_string()).is_err()
+    calc::evaluate(expression.to_string()).is_err()
 }
 
 #[test]
